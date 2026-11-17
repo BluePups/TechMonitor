@@ -52,6 +52,10 @@ namespace TechMonitor
             // Nạp trạng thái lên các CheckBox giao diện
             LoadConfigToUi();
             _isInitializing = false;
+            if (_config.AutoStartWithWindows)
+            {
+                ConfigService.ApplyAutoStart(true);
+            }
 
             // Đọc cấu hình phần cứng tĩnh 1 lần lúc mở app
             LoadHardwareSpecs();
@@ -219,7 +223,7 @@ namespace TechMonitor
 
         private void BtnExitApp_Click(object sender, RoutedEventArgs e) => ExitApplication();
 
-        private void ExitApplication()
+        public void ExitApplication()
         {
             _isForceExit = true;
             _timer.Stop();

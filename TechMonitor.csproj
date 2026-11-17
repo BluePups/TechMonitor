@@ -8,6 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+
+    <Version>1.0.1</Version>
+    <PublishDir>Releases\TechMonitor_v$(Version)\</PublishDir>
   </PropertyGroup>
 
   <ItemGroup>
