@@ -1,0 +1,114 @@
+<Window x:Class="TechMonitor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TechMonitor - Giám sát &amp; Bảo trì Hệ thống"
+        Height="500" Width="560"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize"
+        Background="#F8FAFC">
+
+    <Grid Margin="14">
+        <TabControl Background="White" BorderBrush="#E2E8F0" Padding="12">
+            <!-- TAB 1: TỔNG QUAN PHẦN CỨNG & OVERLAY -->
+            <TabItem Header="Tổng quan &amp; Overlay" FontSize="13" FontWeight="SemiBold">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock Text="Thông số phần cứng hệ thống" FontSize="15" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center"/>
+                            <Button x:Name="BtnRefreshSpecs" Content="↻ Làm mới thông số" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                    Padding="10,5" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" Cursor="Hand"
+                                    Click="BtnRefreshSpecs_Click"/>
+                        </DockPanel>
+
+                        <Border Background="#F1F5F9" CornerRadius="6" Padding="12" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock x:Name="TxtSpecCpu" Text="CPU: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TxtSpecGpu" Text="GPU Rời: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TxtSpecRam" Text="RAM: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TxtSpecRamSticks" Text="" FontSize="12" Foreground="#475569" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Tùy chỉnh hiển thị trên thanh Overlay" FontSize="14" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,8"/>
+                        <CheckBox x:Name="ChkShowOverlay" Content="Bật thanh Overlay trên màn hình" FontWeight="Bold" Margin="0,0,0,8" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+
+                        <WrapPanel Margin="18,0,0,12">
+                            <CheckBox x:Name="ChkShowCpu" Content="Thông số CPU" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+                            <CheckBox x:Name="ChkShowGpu" Content="Thông số GPU rời" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+                            <CheckBox x:Name="ChkShowRam" Content="Dung lượng RAM" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+                            <CheckBox x:Name="ChkShowStatus" Content="Nhãn trạng thái nhiệt" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+                        </WrapPanel>
+
+                        <Button x:Name="BtnToggleLock" Content="Đang KHÓA xuyên chuột (Bấm để mở khóa kéo thả vị trí)"
+                                Padding="12,8" Background="#0F172A" Foreground="White" BorderThickness="0" Cursor="Hand"
+                                Click="BtnToggleLock_Click"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- TAB 2: Ổ ĐĨA & DỌN DẸP -->
+            <TabItem Header="Ổ đĩa &amp; Dọn dẹp" FontSize="13" FontWeight="SemiBold">
+                <StackPanel Margin="0,8,0,0">
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock Text="Danh sách phân vùng ổ cứng" FontSize="15" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center"/>
+                        <Button Content="↻ Cập nhật dung lượng" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                Padding="10,5" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" Cursor="Hand"
+                                Click="BtnRefreshSpecs_Click"/>
+                    </DockPanel>
+
+                    <ItemsControl x:Name="ListDrives" Margin="0,0,0,14">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,6"/>
+                                        <ProgressBar Value="{Binding UsedPercent, Mode=OneWay}" Maximum="100" Height="10" Foreground="#3B82F6" Background="#E2E8F0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Background="#FEFCE8" BorderBrush="#FEF08A" BorderThickness="1" CornerRadius="6" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="Dọn dẹp rác tạm thời an toàn (1-Click)" FontWeight="Bold" Foreground="#854D0E" Margin="0,0,0,4"/>
+                            <TextBlock Text="Xóa bộ nhớ đệm %TEMP%, Windows\Temp, file tải về Windows Update cũ và làm sạch Thùng rác (tự bỏ qua các file đang chạy)."
+                                       FontSize="12" Foreground="#713F12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <Button x:Name="BtnCleanTemp" Content="🧹 Dọn rác hệ thống ngay" Padding="12,8"
+                                    Background="#D97706" Foreground="White" FontWeight="Bold" BorderThickness="0" Cursor="Hand"
+                                    Click="BtnCleanTemp_Click"/>
+                            <TextBlock x:Name="TxtCleanResult" Text="" FontSize="12" FontWeight="SemiBold" Foreground="#15803D" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </TabItem>
+
+            <!-- TAB 3: CÀI ĐẶT & THÔNG TIN -->
+            <TabItem Header="Cài đặt &amp; Hỗ trợ" FontSize="13" FontWeight="SemiBold">
+                <StackPanel Margin="0,8,0,0">
+                    <TextBlock Text="Tùy chọn vận hành" FontSize="15" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,10"/>
+
+                    <CheckBox x:Name="ChkAutoStart" Content="Tự động mở cùng Windows (Chạy ngầm quyền Admin)"
+                              Margin="0,0,0,10" Checked="SettingOption_Changed" Unchecked="SettingOption_Changed"/>
+
+                    <CheckBox x:Name="ChkMinimizeToTray" Content="Thu nhỏ xuống khay hệ thống khi bấm nút tắt (X)"
+                              Margin="0,0,0,16" Checked="SettingOption_Changed" Unchecked="SettingOption_Changed"/>
+
+                    <Button Content="Thoát hoàn toàn ứng dụng" Width="180" HorizontalAlignment="Left" Padding="10,6"
+                            Background="#FEE2E2" Foreground="#B91C1C" BorderBrush="#FECACA" Cursor="Hand"
+                            Click="BtnExitApp_Click" Margin="0,0,0,20"/>
+
+                    <Border Background="#F1F5F9" CornerRadius="6" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="Gợi ý bảo dưỡng định kỳ" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,4"/>
+                            <TextBlock Text="• Nếu thanh Overlay chuyển sang màu ĐỎ báo quá nhiệt hoặc giảm xung khi tải nặng, keo/pad tản nhiệt có thể đã khô hoặc khe gió bám bụi."
+                                       FontSize="12" Foreground="#334155" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock Text="• Khuyến nghị vệ sinh tổng thể &amp; thay tản nhiệt định kỳ mỗi 6 - 12 tháng để giữ hiệu năng ổn định."
+                                       FontSize="12" Foreground="#334155" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>
