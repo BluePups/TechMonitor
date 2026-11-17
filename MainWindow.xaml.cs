@@ -21,6 +21,17 @@ namespace TechMonitor
         private bool _isInitializing = true;
         private bool _isForceExit = false;
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        private const int HOTKEY_ID = 9001;
+        private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_SHIFT = 0x0004;
+        private const uint VK_O = 0x4F; // Phím O -> Tổ hợp Ctrl + Shift + O
+
         public MainWindow()
         {
             InitializeComponent();
@@ -94,7 +105,7 @@ namespace TechMonitor
 
             var icon = new TaskbarIcon
             {
-                Icon = SystemIcons.Shield,
+                Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!) ?? SystemIcons.Shield,
                 ToolTipText = "TechMonitor - Theo dõi nhiệt độ & hiệu năng",
                 ContextMenu = menu
             };
@@ -246,6 +257,10 @@ namespace TechMonitor
         {
             _isForceExit = true;
             _timer.Stop();
+
+            var helper = new System.Windows.Interop.WindowInteropHelper(this);
+            UnregisterHotKey(helper.Handle, HOTKEY_ID);
+
             _trayIcon.Dispose();
             _overlayWindow.Close();
             _sensorService.Dispose();
@@ -256,6 +271,45 @@ namespace TechMonitor
         {
             _sensorService.ResetPeaks();
             RefreshSensors();
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            var helper = new System.Windows.Interop.WindowInteropHelper(this);
+            var source = System.Windows.Interop.HwndSource.FromHwnd(helper.Handle);
+            source?.AddHook(HwndHook);
+            RegisterHotKey(helper.Handle, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, VK_O);
+        }
+
+        private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_HOTKEY = 0x0312;
+            if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
+            {
+                ChkShowOverlay.IsChecked = !(ChkShowOverlay.IsChecked ?? true);
+                handled = true;
+            }
+            return IntPtr.Zero;
+        }
+
+        private async void BtnCopyReport_Click(object sender, RoutedEventArgs e)
+        {
+            string report =
+                $"=== BÁO CÁO TÌNH TRẠNG MÁY (TechMonitor v1.0.3) ===\n" +
+                $"• {TxtSpecCpu.Text}\n" +
+                $"• {TxtSpecGpu.Text}\n" +
+                $"• {TxtSpecRam.Text}\n" +
+                $"• {TxtSpecBattery.Text}\n" +
+                $"• {TxtSpecUptime.Text}\n" +
+                $"• {TxtPeakStats.Text}";
+
+            Clipboard.SetText(report);
+
+            string oldText = BtnCopyReport.Content.ToString() ?? "📋 Copy tình trạng máy";
+            BtnCopyReport.Content = "✓ Đã copy! Dán gửi ngay";
+            await Task.Delay(2000);
+            BtnCopyReport.Content = oldText;
         }
     }
 }

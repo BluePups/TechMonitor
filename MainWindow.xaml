@@ -14,10 +14,15 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                     <StackPanel>
                         <DockPanel Margin="0,0,0,8">
-                            <TextBlock Text="Thông số phần cứng &amp; Sức khỏe máy" FontSize="15" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center"/>
-                            <Button x:Name="BtnRefreshSpecs" Content="↻ Làm mới" DockPanel.Dock="Right" HorizontalAlignment="Right"
-                                    Padding="10,4" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" Cursor="Hand"
-                                    Click="BtnRefreshSpecs_Click"/>
+                            <TextBlock Text="Phần cứng &amp; Sức khỏe máy" FontSize="15" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center"/>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="BtnCopyReport" Content="📋 Copy tình trạng máy" Margin="0,0,6,0"
+                                        Padding="10,4" Background="#ECFDF5" Foreground="#047857" BorderBrush="#A7F3D0" Cursor="Hand"
+                                        Click="BtnCopyReport_Click"/>
+                                <Button x:Name="BtnRefreshSpecs" Content="↻ Làm mới"
+                                        Padding="10,4" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" Cursor="Hand"
+                                        Click="BtnRefreshSpecs_Click"/>
+                            </StackPanel>
                         </DockPanel>
 
                         <Border Background="#F1F5F9" CornerRadius="6" Padding="12" Margin="0,0,0,10">

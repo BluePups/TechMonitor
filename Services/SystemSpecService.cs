@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Runtime.InteropServices;
 
 namespace TechMonitor.Services
 {
@@ -30,6 +31,13 @@ namespace TechMonitor.Services
 
     public class SystemSpecService
     {
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, uint dwFlags);
+
+        private const uint SHERB_NOCONFIRMATION = 0x00000001;
+        private const uint SHERB_NOPROGRESSUI = 0x00000002;
+        private const uint SHERB_NOSOUND = 0x00000004;
+
         public SystemSpecReport GetSystemSpecs()
         {
             var report = new SystemSpecReport();
@@ -206,6 +214,12 @@ namespace TechMonitor.Services
                 if (!Directory.Exists(folder)) continue;
                 freedBytes += DeleteDirectoryContents(new DirectoryInfo(folder));
             }
+
+            try
+            {
+                SHEmptyRecycleBin(IntPtr.Zero, null, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND);
+            }
+            catch { }
 
             return freedBytes / (1024.0 * 1024.0);
         }
