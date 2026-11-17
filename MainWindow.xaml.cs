@@ -127,13 +127,32 @@ namespace TechMonitor
 
             ListDrives.ItemsSource = specs.Drives;
             BtnRefreshSpecs.IsEnabled = true;
+
+            TxtSpecCpu.Text = $"CPU: {specs.CpuName} ({specs.CpuCoresInfo})";
+            TxtSpecGpu.Text = $"GPU Rời: {specs.DiscreteGpuName}";
+            TxtSpecGpuDetail.Text = specs.DiscreteGpuDetail;
+            TxtSpecGpuDetail.Visibility = string.IsNullOrEmpty(specs.DiscreteGpuDetail) ? Visibility.Collapsed : Visibility.Visible;
+
+            TxtSpecRam.Text = $"RAM: {specs.RamSummary}";
+            TxtSpecRamSticks.Text = specs.RamSticks.Count > 0 ? string.Join("  |  ", specs.RamSticks) : "";
+            TxtSpecBattery.Text = $"Sức khỏe Pin: {specs.BatteryHealthSummary}";
+            TxtSpecUptime.Text = $"Thời gian hoạt động (Uptime): {specs.UptimeSummary}";
         }
 
         private void RefreshSensors()
         {
-            if (!_config.ShowOverlay) return;
             var data = _sensorService.ReadSensors();
-            _overlayWindow.UpdateData(data, _config);
+
+            if (_config.ShowOverlay)
+                _overlayWindow.UpdateData(data, _config);
+
+            if (this.IsVisible)
+            {
+                string gpuPeakText = data.HasDiscreteGpu
+                    ? $"{data.MaxGpuTemp:F0}°C ({data.MaxGpuPower:F0}W)"
+                    : "Không có";
+                TxtPeakStats.Text = $"CPU Peak: {data.MaxCpuTemp:F0}°C ({data.MaxCpuPower:F0}W)   |   GPU Peak: {gpuPeakText}";
+            }
         }
 
         private void OverlayOption_Changed(object sender, RoutedEventArgs e)
@@ -231,6 +250,12 @@ namespace TechMonitor
             _overlayWindow.Close();
             _sensorService.Dispose();
             Application.Current.Shutdown();
+        }
+
+        private void BtnResetPeak_Click(object sender, RoutedEventArgs e)
+        {
+            _sensorService.ResetPeaks();
+            RefreshSensors();
         }
     }
 }

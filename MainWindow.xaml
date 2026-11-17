@@ -13,26 +13,42 @@
             <TabItem Header="Tổng quan &amp; Overlay" FontSize="13" FontWeight="SemiBold">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                     <StackPanel>
-                        <DockPanel Margin="0,0,0,10">
-                            <TextBlock Text="Thông số phần cứng hệ thống" FontSize="15" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center"/>
-                            <Button x:Name="BtnRefreshSpecs" Content="↻ Làm mới thông số" DockPanel.Dock="Right" HorizontalAlignment="Right"
-                                    Padding="10,5" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" Cursor="Hand"
+                        <DockPanel Margin="0,0,0,8">
+                            <TextBlock Text="Thông số phần cứng &amp; Sức khỏe máy" FontSize="15" FontWeight="Bold" Foreground="#0F172A" VerticalAlignment="Center"/>
+                            <Button x:Name="BtnRefreshSpecs" Content="↻ Làm mới" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                    Padding="10,4" Background="#EFF6FF" Foreground="#1D4ED8" BorderBrush="#BFDBFE" Cursor="Hand"
                                     Click="BtnRefreshSpecs_Click"/>
                         </DockPanel>
 
-                        <Border Background="#F1F5F9" CornerRadius="6" Padding="12" Margin="0,0,0,14">
+                        <Border Background="#F1F5F9" CornerRadius="6" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock x:Name="TxtSpecCpu" Text="CPU: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TxtSpecGpu" Text="GPU Rời: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TxtSpecRam" Text="RAM: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,4"/>
-                                <TextBlock x:Name="TxtSpecRamSticks" Text="" FontSize="12" Foreground="#475569" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="TxtSpecGpu" Text="GPU Rời: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,2"/>
+                                <TextBlock x:Name="TxtSpecGpuDetail" Text="" FontSize="11.5" Foreground="#475569" Margin="0,0,0,5"/>
+                                <TextBlock x:Name="TxtSpecRam" Text="RAM: Đang đọc..." FontWeight="SemiBold" Foreground="#1E293B" Margin="0,0,0,2"/>
+                                <TextBlock x:Name="TxtSpecRamSticks" Text="" FontSize="11.5" Foreground="#475569" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                <TextBlock x:Name="TxtSpecBattery" Text="Pin: Đang kiểm tra..." FontWeight="SemiBold" Foreground="#0F766E" Margin="0,0,0,4"/>
+                                <TextBlock x:Name="TxtSpecUptime" Text="Thời gian bật máy: ..." FontSize="12" Foreground="#334155"/>
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="Tùy chỉnh hiển thị trên thanh Overlay" FontSize="14" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,8"/>
-                        <CheckBox x:Name="ChkShowOverlay" Content="Bật thanh Overlay trên màn hình" FontWeight="Bold" Margin="0,0,0,8" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+                        <!-- Khung ghi nhận Nhiệt độ & Công suất Đỉnh (Max Peak) -->
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,12">
+                            <DockPanel>
+                                <Button x:Name="BtnResetPeak" Content="Đặt lại đỉnh" DockPanel.Dock="Right" VerticalAlignment="Center"
+                                        Padding="8,4" FontSize="11.5" Background="White" Foreground="#C2410C" BorderBrush="#FDBA74" Cursor="Hand"
+                                        Click="BtnResetPeak_Click"/>
+                                <StackPanel>
+                                    <TextBlock Text="Đỉnh tải tối đa từ lúc mở app (Max Peak)" FontSize="12" FontWeight="Bold" Foreground="#9A3412" Margin="0,0,0,3"/>
+                                    <TextBlock x:Name="TxtPeakStats" Text="CPU Peak: --°C (--W)   |   GPU Peak: --°C (--W)" FontSize="12.5" FontWeight="SemiBold" Foreground="#7C2D12"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
 
-                        <WrapPanel Margin="18,0,0,12">
+                        <TextBlock Text="Tùy chỉnh hiển thị trên thanh Overlay" FontSize="14" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="ChkShowOverlay" Content="Bật thanh Overlay trên màn hình" FontWeight="Bold" Margin="0,0,0,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
+
+                        <WrapPanel Margin="18,0,0,10">
                             <CheckBox x:Name="ChkShowCpu" Content="Thông số CPU" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
                             <CheckBox x:Name="ChkShowGpu" Content="Thông số GPU rời" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
                             <CheckBox x:Name="ChkShowRam" Content="Dung lượng RAM" Margin="0,0,20,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>

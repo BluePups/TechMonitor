@@ -32,6 +32,11 @@ namespace TechMonitor.Services
         public bool IsGpuThrottling { get; set; }
         public string HealthStatus { get; set; } = "Ổn định";
         public string StatusLevel { get; set; } = "Normal"; // Normal | Warning | Critical
+
+        public float MaxCpuTemp { get; set; }
+        public float MaxCpuPower { get; set; }
+        public float MaxGpuTemp { get; set; }
+        public float MaxGpuPower { get; set; }
     }
 
     public class LiveSensorService : IDisposable
@@ -42,6 +47,19 @@ namespace TechMonitor.Services
         private IHardware? _ramHardware;
         private DateTime _lastBatteryGpuPoll = DateTime.MinValue;
         private SensorSnapshot _lastSnapshot = new();
+
+        private float _maxCpuTemp = 0f;
+        private float _maxCpuPower = 0f;
+        private float _maxGpuTemp = 0f;
+        private float _maxGpuPower = 0f;
+
+        public void ResetPeaks()
+        {
+            _maxCpuTemp = 0f;
+            _maxCpuPower = 0f;
+            _maxGpuTemp = 0f;
+            _maxGpuPower = 0f;
+        }
 
         public LiveSensorService()
         {
@@ -184,6 +202,19 @@ namespace TechMonitor.Services
             }
 
             // --- 4. ĐÁNH GIÁ TRẠNG THÁI TỔNG THỂ CHO KHÁCH ---
+            if (snap.CpuTemp > _maxCpuTemp) _maxCpuTemp = snap.CpuTemp;
+            if (snap.CpuPower > _maxCpuPower) _maxCpuPower = snap.CpuPower;
+            if (snap.HasDiscreteGpu && !snap.IsGpuSleeping)
+            {
+                if (snap.GpuTemp > _maxGpuTemp) _maxGpuTemp = snap.GpuTemp;
+                if (snap.GpuPower > _maxGpuPower) _maxGpuPower = snap.GpuPower;
+            }
+
+            snap.MaxCpuTemp = _maxCpuTemp;
+            snap.MaxCpuPower = _maxCpuPower;
+            snap.MaxGpuTemp = _maxGpuTemp;
+            snap.MaxGpuPower = _maxGpuPower;
+
             EvaluateOverallHealth(snap);
 
             _lastSnapshot = snap;
