@@ -130,6 +130,42 @@
                     </Border>
                 </StackPanel>
             </TabItem>
+
+            <TabItem x:Name="TabHistory" Header="Lịch sử cảnh báo" FontSize="13" FontWeight="SemiBold">
+                <DockPanel Margin="0,8,0,0">
+                    <!-- Thanh công cụ Lọc & Xóa ở trên cùng -->
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Lọc theo:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#334155"/>
+                            <ComboBox x:Name="CmbAlertFilter" Width="110" SelectedIndex="0" SelectionChanged="CmbAlertFilter_SelectionChanged">
+                                <ComboBoxItem Content="Tất cả"/>
+                                <ComboBoxItem Content="CPU"/>
+                                <ComboBoxItem Content="GPU"/>
+                                <ComboBoxItem Content="RAM"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <Button x:Name="BtnClearHistory" Content="🗑 Xóa lịch sử" DockPanel.Dock="Right" HorizontalAlignment="Right"
+                                Padding="10,4" Background="#FEF2F2" Foreground="#DC2626" BorderBrush="#FECACA" Cursor="Hand"
+                                Click="BtnClearHistory_Click"/>
+                    </DockPanel>
+
+                    <!-- Danh sách lịch sử -->
+                    <ListBox x:Name="LstAlertHistory" BorderBrush="#E2E8F0" Background="#F8FAFC" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="2,3">
+                                    <TextBlock Text="{Binding TimeText}" FontFamily="Consolas" FontWeight="Bold" Foreground="#475569" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <Border Background="{Binding BadgeColor}" CornerRadius="4" Padding="6,1" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Category}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding Message}" Foreground="#1E293B" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

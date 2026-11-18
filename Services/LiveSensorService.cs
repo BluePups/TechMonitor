@@ -42,6 +42,23 @@ namespace TechMonitor.Services
         public float MaxCpuPower { get; set; }
         public float MaxGpuTemp { get; set; }
         public float MaxGpuPower { get; set; }
+
+        public List<HardwareAlertEvent> NewAlerts { get; set; } = new();
+    }
+
+    public class HardwareAlertEvent
+    {
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public string Category { get; set; } = "CPU"; // "CPU" | "GPU" | "RAM"
+        public string Message { get; set; } = "";
+        public string TimeText => Timestamp.ToString("HH:mm:ss");
+        public string BadgeColor => Category switch
+        {
+            "CPU" => "#DC2626", // Đỏ
+            "GPU" => "#D97706", // Cam đậm
+            "RAM" => "#7C3AED", // Tím
+            _ => "#334155"
+        };
     }
 
     public class LiveSensorService : IDisposable
@@ -65,6 +82,12 @@ namespace TechMonitor.Services
 
         private PerformanceCounter? _cpuLoadFallbackCounter;
         private PerformanceCounter? _cpuPerfFallbackCounter;
+
+        private int _gpuBottleneckTicks = 0;
+        private int _ramBottleneckTicks = 0;
+        private DateTime _lastCpuAlertTime = DateTime.MinValue;
+        private DateTime _lastGpuAlertTime = DateTime.MinValue;
+        private DateTime _lastRamAlertTime = DateTime.MinValue;
 
         public void ResetPeaks()
         {
@@ -272,6 +295,8 @@ namespace TechMonitor.Services
 
             EvaluateOverallHealth(snap);
 
+            CheckAndRecordAlerts(snap);
+
             _lastSnapshot = snap;
             return snap;
         }
@@ -441,6 +466,60 @@ namespace TechMonitor.Services
             _cpuLoadFallbackCounter?.Dispose();
             _cpuPerfFallbackCounter?.Dispose();
             _computer.Close();
+        }
+
+        private void CheckAndRecordAlerts(SensorSnapshot snap)
+        {
+            var now = DateTime.Now;
+
+            // 1. Cảnh báo CPU (Quá nhiệt giảm xung)
+            if (snap.IsCpuThrottling && (now - _lastCpuAlertTime).TotalMinutes >= 2)
+            {
+                _lastCpuAlertTime = now;
+                snap.NewAlerts.Add(new HardwareAlertEvent
+                {
+                    Timestamp = now,
+                    Category = "CPU",
+                    Message = $"Quá nhiệt giảm xung: {snap.CpuTemp:F0}°C — Xung tụt còn {snap.CpuClock:F0} MHz (Tải {snap.CpuLoad:F0}%)"
+                });
+            }
+
+            // 2. Cảnh báo GPU (Quá nhiệt HOẶC nghẽn tải 98%+ liên tục trong khi CPU còn rảnh)
+            if (snap.HasDiscreteGpu && !snap.IsGpuSleeping)
+            {
+                if (snap.GpuLoad >= 98f && snap.CpuLoad < 65f) _gpuBottleneckTicks++;
+                else _gpuBottleneckTicks = 0;
+
+                if ((snap.IsGpuThrottling || _gpuBottleneckTicks >= 5) && (now - _lastGpuAlertTime).TotalMinutes >= 2)
+                {
+                    _lastGpuAlertTime = now;
+                    string reason = snap.IsGpuThrottling
+                        ? $"GPU quá nhiệt giảm xung: {snap.GpuTemp:F0}°C (Tải {snap.GpuLoad:F0}%)"
+                        : $"Nghẽn cổ chai GPU: Tải kịch khung {snap.GpuLoad:F0}% ({snap.GpuTemp:F0}°C) trong khi CPU chỉ {snap.CpuLoad:F0}%";
+
+                    snap.NewAlerts.Add(new HardwareAlertEvent
+                    {
+                        Timestamp = now,
+                        Category = "GPU",
+                        Message = reason
+                    });
+                }
+            }
+
+            // 3. Cảnh báo RAM (Tràn RAM >= 90% liên tục -> Windows đẩy sang ổ cứng gây drop 1% Low FPS)
+            if (snap.RamLoadPercent >= 90f) _ramBottleneckTicks++;
+            else _ramBottleneckTicks = 0;
+
+            if (_ramBottleneckTicks >= 4 && (now - _lastRamAlertTime).TotalMinutes >= 2)
+            {
+                _lastRamAlertTime = now;
+                snap.NewAlerts.Add(new HardwareAlertEvent
+                {
+                    Timestamp = now,
+                    Category = "RAM",
+                    Message = $"Tràn bộ nhớ RAM: Đã dùng {snap.RamUsedGb:F1}/{snap.RamTotalGb:F1} GB ({snap.RamLoadPercent:F0}%) — Dễ gây khựng hình"
+                });
+            }
         }
     }
 }

@@ -32,6 +32,9 @@ namespace TechMonitor
         private const uint MOD_SHIFT = 0x0004;
         private const uint VK_O = 0x4F; // Phím O -> Tổ hợp Ctrl + Shift + O
 
+        private readonly System.Collections.ObjectModel.ObservableCollection<HardwareAlertEvent> _alertHistory = new();
+        private System.ComponentModel.ICollectionView? _alertView;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -76,6 +79,16 @@ namespace TechMonitor
             _timer.Tick += (s, e) => RefreshSensors();
             _timer.Start();
             RefreshSensors();
+
+            LstAlertHistory.ItemsSource = _alertHistory;
+            _alertView = System.Windows.Data.CollectionViewSource.GetDefaultView(_alertHistory);
+            _alertView.Filter = FilterAlertItem;
+
+            _overlayWindow.AlertBadgeClicked += () =>
+            {
+                ShowMainWindow();
+                TabHistory.IsSelected = true;
+            };
         }
 
         private TaskbarIcon CreateTrayIcon()
@@ -164,6 +177,16 @@ namespace TechMonitor
                     : "Không có";
                 TxtPeakStats.Text = $"CPU Peak: {data.MaxCpuTemp:F0}°C ({data.MaxCpuPower:F0}W)   |   GPU Peak: {gpuPeakText}";
             }
+
+            if (data.NewAlerts.Count > 0)
+            {
+                foreach (var alert in data.NewAlerts)
+                {
+                    _alertHistory.Insert(0, alert); // Mới nhất nằm trên cùng
+                    if (_alertHistory.Count > 150)
+                        _alertHistory.RemoveAt(_alertHistory.Count - 1);
+                }
+            }
         }
 
         private void OverlayOption_Changed(object sender, RoutedEventArgs e)
@@ -237,6 +260,7 @@ namespace TechMonitor
         {
             this.Show();
             this.WindowState = WindowState.Normal;
+            _overlayWindow.ClearUnreadBadge();
             this.Activate();
         }
 
@@ -310,6 +334,26 @@ namespace TechMonitor
             BtnCopyReport.Content = "✓ Đã copy! Dán gửi ngay";
             await Task.Delay(2000);
             BtnCopyReport.Content = oldText;
+        }
+
+        private bool FilterAlertItem(object obj)
+        {
+            if (obj is not HardwareAlertEvent item) return false;
+            if (CmbAlertFilter.SelectedItem is not ComboBoxItem selected) return true;
+
+            string filter = selected.Content?.ToString() ?? "Tất cả";
+            return filter == "Tất cả" || item.Category.Equals(filter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void CmbAlertFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _alertView?.Refresh();
+        }
+
+        private void BtnClearHistory_Click(object sender, RoutedEventArgs e)
+        {
+            _alertHistory.Clear();
+            _overlayWindow.ClearUnreadBadge();
         }
     }
 }

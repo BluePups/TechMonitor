@@ -43,6 +43,18 @@
             <Border x:Name="PanelStatus" Background="#2222C55E" CornerRadius="4" Padding="6,2">
                 <TextBlock x:Name="TxtStatus" Text="Ổn định" Foreground="#4ADE80" FontWeight="Bold" FontSize="11"/>
             </Border>
+
+            <Button x:Name="BtnAlertBadge" Visibility="Collapsed" Margin="8,0,0,0" Padding="6,2"
+                    Background="#DC2626" Foreground="White" FontSize="11" FontWeight="Bold"
+                    BorderThickness="0" Cursor="Hand" Click="BtnAlertBadge_Click"
+                    ToolTip="Bấm để mở lịch sử quá nhiệt / nghẽn phần cứng">
+                <Button.Resources>
+                    <Style TargetType="Border">
+                        <Setter Property="CornerRadius" Value="8"/>
+                    </Style>
+                </Button.Resources>
+                <TextBlock x:Name="TxtAlertBadge" Text="⚠ +1"/>
+            </Button>
         </StackPanel>
     </Border>
 </Window>

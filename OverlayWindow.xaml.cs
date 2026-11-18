@@ -36,6 +36,9 @@ namespace TechMonitor
         public bool IsClickThroughLocked { get; private set; } = true;
         public event Action<double, double>? PositionChanged;
 
+        public event Action? AlertBadgeClicked;
+        private int _unreadAlerts = 0;
+
         public OverlayWindow()
         {
             InitializeComponent();
@@ -148,6 +151,25 @@ namespace TechMonitor
                 PanelStatus.Background = new SolidColorBrush(Color.FromArgb(35, 34, 197, 94));
                 TxtStatus.Foreground = new SolidColorBrush(Color.FromRgb(74, 222, 128));
             }
+
+            if (data.NewAlerts.Count > 0)
+            {
+                _unreadAlerts += data.NewAlerts.Count;
+                TxtAlertBadge.Text = $"⚠ +{_unreadAlerts}";
+                BtnAlertBadge.Visibility = Visibility.Visible;
+            }
+        }
+
+        public void ClearUnreadBadge()
+        {
+            _unreadAlerts = 0;
+            BtnAlertBadge.Visibility = Visibility.Collapsed;
+        }
+
+        private void BtnAlertBadge_Click(object sender, RoutedEventArgs e)
+        {
+            ClearUnreadBadge();
+            AlertBadgeClicked?.Invoke();
         }
     }
 }
