@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -65,7 +66,10 @@ namespace TechMonitor
             try
             {
                 string currentPath = Environment.ProcessPath ?? "";
-                Version currentVer = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0, 0);
+                var currentVerInfo = !string.IsNullOrEmpty(currentPath)
+                    ? FileVersionInfo.GetVersionInfo(currentPath)
+                    : null;
+                Version.TryParse(currentVerInfo?.FileVersion, out var currentVer);
 
                 var currentProc = Process.GetCurrentProcess();
                 var otherProcs = Process.GetProcessesByName(currentProc.ProcessName)
@@ -78,16 +82,30 @@ namespace TechMonitor
                         string? runningPath = proc.MainModule?.FileName;
                         if (!string.IsNullOrEmpty(runningPath))
                         {
-                            // Nếu khác đường dẫn (VD: chạy file mới tải ở Downloads trong khi bản cũ đang chạy ở ProgramData)
+                            // 1. Khác thư mục chạy (VD: bản cũ chạy ở ProgramData, bản mới chạy ở Downloads) -> Luôn thay thế
                             if (!runningPath.Equals(currentPath, StringComparison.OrdinalIgnoreCase))
                                 return true;
 
+                            // 2. Cùng thư mục -> So sánh FileVersion với FileVersion cho đồng nhất
                             var runningVerInfo = FileVersionInfo.GetVersionInfo(runningPath);
-                            if (Version.TryParse(runningVerInfo.FileVersion, out var runningVer) && currentVer > runningVer)
+                            if (currentVer != null &&
+                                Version.TryParse(runningVerInfo.FileVersion, out var runningVer) &&
+                                currentVer > runningVer)
+                            {
                                 return true;
+                            }
                         }
                     }
+                    catch (Win32Exception)
+                    {
+                        // Không đọc được MainModule do bản cũ chạy ở mức quyền khác -> Ưu tiên thay thế để tránh kẹt bản cũ
+                        return true;
+                    }
                     catch { }
+                    finally
+                    {
+                        proc.Dispose();
+                    }
                 }
             }
             catch { }
@@ -119,33 +137,41 @@ namespace TechMonitor
             _wakeUpEvent = new EventWaitHandle(false, EventResetMode.AutoReset, UniqueWakeUpEventName);
             Task.Run(() =>
             {
-                while (true)
+                try
                 {
-                    _wakeUpEvent.WaitOne();
-                    Dispatcher.Invoke(() =>
+                    while (_wakeUpEvent != null)
                     {
-                        if (MainWindow is MainWindow mainWin)
+                        _wakeUpEvent.WaitOne();
+                        Dispatcher.Invoke(() =>
                         {
-                            mainWin.Show();
-                            mainWin.WindowState = WindowState.Normal;
-                            mainWin.Activate();
-                        }
-                    });
+                            if (MainWindow is MainWindow mainWin)
+                            {
+                                mainWin.Show();
+                                mainWin.WindowState = WindowState.Normal;
+                                mainWin.Activate();
+                            }
+                        });
+                    }
                 }
+                catch (ObjectDisposedException) { }
             });
 
             // Luồng 2: Lắng nghe lệnh nhường quyền từ phiên bản mới hơn
             _shutdownOldEvent = new EventWaitHandle(false, EventResetMode.AutoReset, UniqueShutdownEventName);
             Task.Run(() =>
             {
-                _shutdownOldEvent.WaitOne();
-                Dispatcher.Invoke(() =>
+                try
                 {
-                    if (MainWindow is MainWindow mainWin)
-                        mainWin.ExitApplication();
-                    else
-                        Shutdown();
-                });
+                    _shutdownOldEvent.WaitOne();
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (MainWindow is MainWindow mainWin)
+                            mainWin.ExitApplication();
+                        else
+                            Shutdown();
+                    });
+                }
+                catch (ObjectDisposedException) { }
             });
         }
 
