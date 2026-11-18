@@ -1,8 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Management;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
+using Microsoft.Win32;
 
 namespace TechMonitor.Services
 {
@@ -53,6 +58,14 @@ namespace TechMonitor.Services
         private float _maxGpuTemp = 0f;
         private float _maxGpuPower = 0f;
 
+        private float _baseClockMhz = 2500f;
+        private float _observedMaxClockMhz = 0f;
+        private int _highTempStreakTicks = 0;
+        private float _tjMaxTemp = 100f;
+
+        private PerformanceCounter? _cpuLoadFallbackCounter;
+        private PerformanceCounter? _cpuPerfFallbackCounter;
+
         public void ResetPeaks()
         {
             _maxCpuTemp = 0f;
@@ -63,6 +76,9 @@ namespace TechMonitor.Services
 
         public LiveSensorService()
         {
+            EnsurePawnIoInstalled(); // Tự cài PawnIO nếu máy chưa có
+            InitFallbackCounters();  // Chuẩn bị sẵn bộ đếm dự phòng của Windows
+            
             _computer = new Computer
             {
                 IsCpuEnabled = true,
@@ -80,6 +96,25 @@ namespace TechMonitor.Services
             _cpuHardware = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
             _ramHardware = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Memory);
             _discreteGpuHardware = FindDiscreteGpu();
+
+            // Đọc xung gốc (Base Clock) và ước lượng TjMax theo dòng CPU
+            try
+            {
+                using var searcher = new ManagementObjectSearcher("SELECT Name, MaxClockSpeed FROM Win32_Processor");
+                foreach (ManagementObject obj in searcher.Get())
+                {
+                    string cpuName = obj["Name"]?.ToString() ?? "";
+                    if (obj["MaxClockSpeed"] != null && float.TryParse(obj["MaxClockSpeed"].ToString(), out float baseMhz) && baseMhz > 0)
+                        _baseClockMhz = baseMhz;
+
+                    // Ryzen 7000/8000 có trần TjMax thiết kế 95°C; các dòng khác thường 100°C - 105°C
+                    if (cpuName.Contains("Ryzen", StringComparison.OrdinalIgnoreCase) &&
+                    (cpuName.Contains("7") || cpuName.Contains("8")))
+                        _tjMaxTemp = 95f;
+                    break;
+                }
+            }
+            catch { }
         }
 
         // Lọc riêng GPU rời (dGPU), loại bỏ card onboard của Intel và AMD
@@ -143,9 +178,29 @@ namespace TechMonitor.Services
                 snap.CpuClock = coreClocks.Any() ? coreClocks.Max() : 0;
 
                 // Kiểm tra cờ phần cứng báo Thermal Throttling
-                var throttleFlag = GetSensorValue(_cpuHardware, SensorType.Factor, false, "Thermal Throttling");
-                snap.IsCpuThrottling = (throttleFlag >= 1f && snap.CpuTemp >= 85f) ||
-                                       (snap.CpuLoad > 60f && snap.CpuTemp >= 92f && snap.CpuClock > 0 && snap.CpuClock < 2200f);
+                snap.IsCpuThrottling = DetectRealCpuThrottling(_cpuHardware, snap);
+
+                // Nếu cả nhiệt độ lẫn công suất CPU đều bằng 0 -> Driver bị chặn, kích hoạt Fallback
+                if (snap.CpuTemp <= 0f && snap.CpuPower <= 0f)
+                {
+                    snap.IsSensorBlocked = true;
+
+                    if (snap.CpuLoad <= 0f && _cpuLoadFallbackCounter != null)
+                    {
+                        try { snap.CpuLoad = _cpuLoadFallbackCounter.NextValue(); } catch { }
+                    }
+
+                    if (snap.CpuClock <= 0f && _cpuPerfFallbackCounter != null)
+                    {
+                        try
+                        {
+                            // % Processor Performance nhân với xung gốc sẽ ra xung nhịp thực tế (MHz)
+                            float perfPercent = _cpuPerfFallbackCounter.NextValue();
+                            if (perfPercent > 0) snap.CpuClock = _baseClockMhz * (perfPercent / 100f);
+                        }
+                        catch { }
+                    }
+                }
             }
 
             // --- 2. ĐỌC THÔNG SỐ GPU RỜI ---
@@ -223,35 +278,67 @@ namespace TechMonitor.Services
 
         private void EvaluateOverallHealth(SensorSnapshot snap)
         {
-            // Nếu cả nhiệt độ lẫn công suất CPU đều bằng 0 -> Driver đã bị Windows Security / Core Isolation chặn
-            if (snap.CpuTemp <= 0f && snap.CpuPower <= 0f)
-            {
-                snap.IsSensorBlocked = true;
-                snap.StatusLevel = "Critical";
-                snap.HealthStatus = "Bị chặn cảm biến (Kiểm tra Windows Security / Core Isolation)";
-                return;
-            }
-
             if (snap.IsCpuThrottling || snap.IsGpuThrottling)
             {
                 snap.StatusLevel = "Critical";
                 snap.HealthStatus = "Quá nhiệt - Đang giảm xung!";
             }
-            else if (snap.CpuTemp >= 90f || snap.GpuTemp >= 84f)
+            else if ((!snap.IsSensorBlocked && snap.CpuTemp >= 90f) || snap.GpuTemp >= 84f)
             {
                 snap.StatusLevel = "Critical";
                 snap.HealthStatus = "Nhiệt rất cao - Cần kiểm tra tản nhiệt";
             }
-            else if (snap.CpuTemp >= 78f || snap.GpuTemp >= 75f)
+            else if ((!snap.IsSensorBlocked && snap.CpuTemp >= 78f) || snap.GpuTemp >= 75f)
             {
                 snap.StatusLevel = "Warning";
                 snap.HealthStatus = "Tải cao";
+            }
+            else if (snap.IsSensorBlocked)
+            {
+                snap.StatusLevel = "Warning";
+                snap.HealthStatus = "Chế độ cơ bản (Chưa đọc được nhiệt độ CPU)";
             }
             else
             {
                 snap.StatusLevel = "Normal";
                 snap.HealthStatus = "Mát mẻ / Ổn định";
             }
+        }
+
+        private bool DetectRealCpuThrottling(IHardware cpuHardware, SensorSnapshot snap)
+        {
+            // 1. Đọc cờ báo phần cứng trực tiếp (nếu thư viện đọc được từ thanh ghi MSR)
+            var throttleFlag = GetSensorValue(cpuHardware, SensorType.Factor, false, "Thermal Throttling");
+            if (throttleFlag >= 1f && snap.CpuTemp >= 85f)
+                return true;
+
+            // 2. Cập nhật TjMax chính xác trên chip Intel qua cảm biến "Distance to TjMax"
+            float distToTjMax = GetSensorValue(cpuHardware, SensorType.Temperature, false, "Distance to TjMax");
+            if (distToTjMax > 0 && snap.CpuTemp > 0)
+                _tjMaxTemp = snap.CpuTemp + distToTjMax;
+
+            // 3. Tự học xung nhịp Boost đỉnh thực tế của máy
+            if (snap.CpuClock > _observedMaxClockMhz)
+                _observedMaxClockMhz = snap.CpuClock;
+
+            // 4. Đếm số nhịp liên tiếp nhiệt độ chạm vùng nguy hiểm (cách TjMax <= 6°C)
+            float dangerThreshold = _tjMaxTemp - 6f;
+            if (snap.CpuTemp >= dangerThreshold)
+                _highTempStreakTicks++;
+            else
+                _highTempStreakTicks = 0; // Tụt nhiệt ngay -> Chỉ là bung xung tức thời, xóa bộ đếm
+
+            // 5. Kết luận Throttling khi thỏa ĐỒNG THỜI 3 điều kiện:
+            // - Nhiệt cao kéo dài >= 4 nhịp (~6-8 giây liên tiếp)
+            // - CPU vẫn đang tải nặng >= 50%
+            // - Xung nhịp bị ép tụt dưới 80% xung đỉnh đã học (hoặc rơi sát xung gốc Base Clock)
+            bool isSustainedHot = _highTempStreakTicks >= 4;
+            bool isStillUnderLoad = snap.CpuLoad >= 50f;
+            bool isClockDropped = snap.CpuClock > 0 &&
+                                ((_observedMaxClockMhz > 0 && snap.CpuClock < _observedMaxClockMhz * 0.80f) ||
+                                (snap.CpuClock <= _baseClockMhz * 1.05f));
+
+            return isSustainedHot && isStillUnderLoad && isClockDropped;
         }
 
         // Hàm hỗ trợ tìm cảm biến theo danh sách từ khóa ưu tiên
@@ -302,9 +389,58 @@ namespace TechMonitor.Services
             return true;
         }
 
+        private static void EnsurePawnIoInstalled()
+        {
+            try
+            {
+                // Kiểm tra dịch vụ PawnIO đã có trong Windows chưa
+                using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PawnIO");
+                if (key != null) return;
+
+                string tempInstaller = Path.Combine(Path.GetTempPath(), "PawnIO_setup.exe");
+                using var stream = Assembly.GetExecutingAssembly()
+                    .GetManifestResourceStream("TechMonitor.PawnIO_setup.exe");
+
+                if (stream == null) return;
+
+                using (var fs = File.Create(tempInstaller))
+                    stream.CopyTo(fs);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = tempInstaller,
+                    Arguments = "-install -silent",
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                using var proc = Process.Start(psi);
+                proc?.WaitForExit(10000);
+                try { File.Delete(tempInstaller); } catch { }
+            }
+            catch { }
+        }
+
+        private void InitFallbackCounters()
+        {
+            try
+            {
+                _cpuLoadFallbackCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                _cpuPerfFallbackCounter = new PerformanceCounter("Processor Information", "% Processor Performance", "_Total");
+
+                // Bắt buộc gọi NextValue() 1 lần đầu để làm nóng bộ đếm (lần đầu Windows luôn trả về 0)
+                _cpuLoadFallbackCounter.NextValue();
+                _cpuPerfFallbackCounter.NextValue();
+            }
+            catch { }
+        }
+
         public void Dispose()
         {
-            _computer.Close(); // Bắt buộc đóng để giải phóng driver đọc phần cứng
+            _cpuLoadFallbackCounter?.Dispose();
+            _cpuPerfFallbackCounter?.Dispose();
+            _computer.Close();
         }
     }
 }

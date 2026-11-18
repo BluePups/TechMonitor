@@ -9,7 +9,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
 
-    <Version>1.0.3</Version>
+    <Version>1.0.5</Version>
     <PublishDir>Releases\TechMonitor_v$(Version)\</PublishDir>
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
@@ -17,7 +17,9 @@
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="11.0.0" />
     <PackageReference Include="TaskScheduler" Version="2.12.2" />
+    <EmbeddedResource Include="PawnIO_setup.exe" />
   </ItemGroup>
 
 </Project>
