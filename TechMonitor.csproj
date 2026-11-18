@@ -9,7 +9,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
 
-    <Version>1.0.6</Version>
+    <Version>1.0.7</Version>
     <PublishDir>Releases\TechMonitor_v$(Version)\</PublishDir>
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
