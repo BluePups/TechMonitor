@@ -35,6 +35,9 @@ namespace TechMonitor
         private readonly System.Collections.ObjectModel.ObservableCollection<HardwareAlertEvent> _alertHistory = new();
         private System.ComponentModel.ICollectionView? _alertView;
 
+        private readonly HardwareLimitService _limitService = new();
+        private SensorSnapshot _latestSnapshot = new();
+
         public MainWindow()
         {
             InitializeComponent();
@@ -79,6 +82,7 @@ namespace TechMonitor
             _timer.Tick += (s, e) => RefreshSensors();
             _timer.Start();
             RefreshSensors();
+            LoadHardwareLimits();
 
             LstAlertHistory.ItemsSource = _alertHistory;
             _alertView = System.Windows.Data.CollectionViewSource.GetDefaultView(_alertHistory);
@@ -166,6 +170,7 @@ namespace TechMonitor
         private void RefreshSensors()
         {
             var data = _sensorService.ReadSensors();
+            _latestSnapshot = data;
 
             if (_config.ShowOverlay)
                 _overlayWindow.UpdateData(data, _config);
@@ -186,6 +191,24 @@ namespace TechMonitor
                     if (_alertHistory.Count > 150)
                         _alertHistory.RemoveAt(_alertHistory.Count - 1);
                 }
+            }
+
+            if (data.HasDiscreteGpu && data.GpuPower > 15f &&
+                (data.GpuName != _config.CalibratedGpuName || data.GpuPower > _config.CalibratedGpuMaxPowerW + 1f))
+            {
+                _config.CalibratedGpuName = data.GpuName;
+                _config.CalibratedGpuMaxPowerW = data.GpuPower;
+                ConfigService.Save(_config);
+                LoadHardwareLimits();
+            }
+
+            // Tự cập nhật trần CPU nếu phát hiện mức công suất thực tế cao hơn mức đã lưu trước đó
+            if (data.CpuPower > _config.CalibratedCpuMaxPowerW + 0.5f &&
+                data.CpuName.Equals(_config.CalibratedCpuName, StringComparison.OrdinalIgnoreCase))
+            {
+                _config.CalibratedCpuMaxPowerW = data.CpuPower;
+                ConfigService.Save(_config);
+                LoadHardwareLimits();
             }
         }
 
@@ -289,6 +312,7 @@ namespace TechMonitor
             _overlayWindow.Close();
             _sensorService.Dispose();
             Application.Current.Shutdown();
+            _limitService.StopStressTest();
         }
 
         private void BtnResetPeak_Click(object sender, RoutedEventArgs e)
@@ -354,6 +378,95 @@ namespace TechMonitor
         {
             _alertHistory.Clear();
             _overlayWindow.ClearUnreadBadge();
+        }
+
+        private void LoadHardwareLimits()
+        {
+            // 1. Nạp trần GPU rời ngay lập tức
+            if (_latestSnapshot.HasDiscreteGpu)
+            {
+                var (gpuMaxW, gpuMaxMhz, gpuMaxTemp) = HardwareLimitService.GetDiscreteGpuLimits(_latestSnapshot.GpuName);
+                if (gpuMaxW > 0 || gpuMaxMhz > 0 || gpuMaxTemp > 0)
+                {
+                    float effectiveGpuW = gpuMaxW > 0
+                        ? gpuMaxW
+                        : (_config.CalibratedGpuName == _latestSnapshot.GpuName ? _config.CalibratedGpuMaxPowerW : 0f);
+                    string wText = effectiveGpuW > 0 ? $"{effectiveGpuW:F0}W" : "Chờ tải thực tế";
+                    string mhzText = gpuMaxMhz > 0 ? $"{gpuMaxMhz} MHz" : "N/A";
+                    string tempText = gpuMaxTemp > 0 ? $" • Trần nhiệt {gpuMaxTemp}°C" : "";
+                    TxtGpuLimit.Text = $"• Trần GPU rời: {wText} • Xung đỉnh {mhzText} • {tempText}";
+                }
+                else
+                {
+                    TxtGpuLimit.Text = "• Trần GPU rời: Tự động ghi nhận theo mức tải thực tế (Max Peak)";
+                }
+            }
+            else
+            {
+                TxtGpuLimit.Text = "• Trần GPU rời: Máy không sử dụng card đồ họa rời";
+            }
+
+            // Khi chưa chạy bài test 45s vẫn hiện được trần nhiệt TjMax của chip:
+            TxtCpuLimit.Text = $"• Trần CPU: Chưa đo công suất trần • Trần nhiệt {_latestSnapshot.CpuTjMaxTemp:F0}°C";
+
+            // 2. Nạp trần CPU đã lưu (chỉ hiện nếu trùng đúng tên CPU của máy hiện tại)
+            if (!string.IsNullOrEmpty(_config.CalibratedCpuName) &&
+                _config.CalibratedCpuName.Equals(_latestSnapshot.CpuName, StringComparison.OrdinalIgnoreCase) &&
+                _config.CalibratedCpuMaxPowerW > 0)
+            {
+                // Khi đã đo xong:
+                TxtCpuLimit.Text = $"• Trần CPU (Đã đo): {_config.CalibratedCpuMaxPowerW:F1}W • Xung đỉnh {_config.CalibratedCpuMaxClockMhz:F0} MHz • Trần nhiệt {_latestSnapshot.CpuTjMaxTemp:F0}°C";
+                BtnCpuStressTest.Content = "↻ Đo lại trần CPU";
+            }
+        }
+
+        private async void BtnCpuStressTest_Click(object sender, RoutedEventArgs e)
+        {
+            if (_limitService.IsStressRunning)
+            {
+                _limitService.StopStressTest();
+                return;
+            }
+
+            BtnCpuStressTest.Background = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FEE2E2"));
+            BtnCpuStressTest.Foreground = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#DC2626"));
+
+            var result = await _limitService.RunCpuCeilingTestAsync(
+                durationSeconds: 45,
+                getLatestSnapshot: () => _latestSnapshot,
+                onProgress: (remainSec, currentW, currentTemp) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        BtnCpuStressTest.Content = $"⏹ Dừng đo ({remainSec}s)";
+                        TxtCpuLimit.Text = $"• Đang đo trần CPU... Công suất: {currentW:F1}W | Nhiệt độ: {currentTemp:F0}°C";
+                    });
+                });
+
+            // Trả lại màu nút bình thường
+            BtnCpuStressTest.Background = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FEF3C7"));
+            BtnCpuStressTest.Foreground = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B45309"));
+            BtnCpuStressTest.Content = "↻ Đo lại trần CPU";
+
+            if (result.PeakPowerW > 0)
+            {
+                _config.CalibratedCpuName = _latestSnapshot.CpuName;
+                _config.CalibratedCpuMaxPowerW = result.PeakPowerW;
+                _config.CalibratedCpuMaxClockMhz = Math.Max(result.PeakClockMhz, _latestSnapshot.CpuClock);
+                ConfigService.Save(_config);
+
+                string note = result.StoppedByThermal ? " (Tự ngắt an toàn ở 95°C)" : "";
+                // Khi đã đo xong:
+                TxtCpuLimit.Text = $"• Trần CPU (Đã đo): {_config.CalibratedCpuMaxPowerW:F1}W • Xung đỉnh {_config.CalibratedCpuMaxClockMhz:F0} MHz • Trần nhiệt {_latestSnapshot.CpuTjMaxTemp:F0}°C";
+            }
+            else
+            {
+                TxtCpuLimit.Text = "• Trần CPU: Không đọc được công suất (Kiểm tra quyền cảm biến)";
+            }
         }
     }
 }

@@ -19,6 +19,14 @@ namespace TechMonitor.Services
 
         public bool MinimizeToTrayOnClose { get; set; } = true;
         public bool AutoStartWithWindows { get; set; } = false;
+
+        public string CalibratedCpuName { get; set; } = "";
+        public float CalibratedCpuMaxPowerW { get; set; } = 0f;
+        public float CalibratedCpuMaxClockMhz { get; set; } = 0f;
+        public float CalibratedCpuMaxVolt { get; set; } = 0f;
+
+        public string CalibratedGpuName { get; set; } = "";
+        public float CalibratedGpuMaxPowerW { get; set; } = 0f;
     }
 
     public static class ConfigService

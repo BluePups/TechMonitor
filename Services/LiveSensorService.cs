@@ -19,6 +19,7 @@ namespace TechMonitor.Services
         public float CpuLoad { get; set; }
         public float CpuPower { get; set; }
         public float CpuClock { get; set; }
+        public float CpuTjMaxTemp { get; set; } = 100f;
 
         public string GpuName { get; set; } = "GPU Rời";
         public bool HasDiscreteGpu { get; set; }
@@ -131,10 +132,13 @@ namespace TechMonitor.Services
                         _baseClockMhz = baseMhz;
 
                     // Ryzen 7000/8000 có trần TjMax thiết kế 95°C; các dòng khác thường 100°C - 105°C
-                    if (cpuName.Contains("Ryzen", StringComparison.OrdinalIgnoreCase) &&
-                    (cpuName.Contains("7") || cpuName.Contains("8")))
-                        _tjMaxTemp = 95f;
-                    break;
+                    if (cpuName.Contains("Ryzen", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (cpuName.Contains("7") || cpuName.Contains("8") || cpuName.Contains("9"))
+                            _tjMaxTemp = 95f;
+                        else
+                            _tjMaxTemp = 105f;
+                    }
                 }
             }
             catch { }
@@ -183,6 +187,8 @@ namespace TechMonitor.Services
                 _cpuHardware.Update();
                 snap.CpuName = _cpuHardware.Name;
 
+                snap.CpuTjMaxTemp = _tjMaxTemp;
+
                 // Nhiệt độ: Intel dùng "CPU Package", AMD Ryzen dùng "Core (Tctl/Tdie)"
                 snap.CpuTemp = GetSensorValue(_cpuHardware, SensorType.Temperature, true,
                     "CPU Package", "Core (Tctl/Tdie)", "Tctl/Tdie", "Package");
@@ -191,8 +197,15 @@ namespace TechMonitor.Services
                 snap.CpuLoad = GetSensorValue(_cpuHardware, SensorType.Load, true, "CPU Total");
 
                 // Công suất điện (Watt)
-                snap.CpuPower = GetSensorValue(_cpuHardware, SensorType.Power, true,
-                    "CPU Package", "Package", "Cores");
+                var cpuPowerSensor = _cpuHardware.Sensors
+                    .Where(s => s.SensorType == SensorType.Power && s.Value.HasValue &&
+                            (s.Name.Contains("PPT", StringComparison.OrdinalIgnoreCase) ||
+                                s.Name.Contains("Package", StringComparison.OrdinalIgnoreCase)))
+                    .OrderByDescending(s => s.Value!.Value)
+                    .FirstOrDefault();
+
+                if (cpuPowerSensor?.Value != null)
+                    snap.CpuPower = cpuPowerSensor.Value.Value;
 
                 // Xung nhịp cao nhất trong các nhân (MHz)
                 var coreClocks = _cpuHardware.Sensors

@@ -50,6 +50,25 @@
                             </DockPanel>
                         </Border>
 
+                        <!-- Khung hiển thị Trần tối đa của CPU & GPU -->
+                        <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,6,0,0">
+                            <Button x:Name="BtnCpuStressTest" Content="⚡ Đo trần CPU (45s)"
+                                    Padding="10,5" Margin="8,0,0,0" VerticalAlignment="Center"
+                                    Background="#FEF3C7" Foreground="#B45309" BorderBrush="#FCD34D" FontWeight="SemiBold" Cursor="Hand"
+                                    Click="BtnCpuStressTest_Click"/>
+                        </Border>
+
+                        <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,6,0,0">
+                            <DockPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtCpuLimit" Text="• Trần CPU: Chưa đo công suất trần (Bấm nút bên phải để test 45s)"
+                                            FontSize="12.5" FontWeight="SemiBold" Foreground="#1E293B"/>
+                                    <TextBlock x:Name="TxtGpuLimit" Text="• Trần GPU rời: Đang đọc thông số VBIOS/Driver..."
+                                            FontSize="12.5" Foreground="#334155" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
                         <TextBlock Text="Tùy chỉnh hiển thị trên thanh Overlay" FontSize="14" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,0,6"/>
                         <CheckBox x:Name="ChkShowOverlay" Content="Bật thanh Overlay trên màn hình" FontWeight="Bold" Margin="0,0,0,6" Checked="OverlayOption_Changed" Unchecked="OverlayOption_Changed"/>
 
